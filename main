@@ -1,0 +1,87 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+
+# Define the layout and style
+st.markdown(
+    """
+    <style>
+    .main {
+        background-color: #F5F5F5;
+        border: 2px solid #E0E0E0;
+        padding: 10px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Application title and HTML for style
+st.markdown(
+    '''
+    <div style="background-color: #0068C8; padding: 10px; border-radius: 5px;">
+        <h1 style="color: white; text-align: center;">Application de Learning Analytics</h1>
+    </div>
+    ''',
+    unsafe_allow_html=True
+)
+
+# File upload functionality
+uploaded_file = st.file_uploader("Choisissez un fichier CSV pour l'analyse", type="csv")
+if uploaded_file is not None:
+    data = pd.read_csv(uploaded_file)
+    data.replace(',', '.', regex=True, inplace=True)
+    data = data.apply(pd.to_numeric, errors='coerce')
+else:
+    st.stop()
+
+# Subheader and data overview
+st.subheader('Aperçu des données')
+st.write(data.head())
+
+# Data visualization
+st.subheader('Visualisation des Données')
+selected_features = st.multiselect('Sélectionnez les caractéristiques à visualiser:', data.columns.drop('Moyenne'), default=['Math'])
+
+# Visualization of percentages of students with a mean score above 5 for each selected feature
+st.subheader("Pourcentage d'élèves avec une moyenne supérieure à 5 par caractéristique")
+percentages = {feature: (data[data[feature] > 5][feature].count() / data[feature].count()) * 100 for feature in selected_features}
+
+# Displaying the results in a bar chart
+percentages_df = pd.DataFrame(list(percentages.items()), columns=['Feature', 'Percentage'])
+fig = px.bar(percentages_df, x='Feature', y='Percentage', title="Pourcentage d'élèves avec des scores supérieurs à 5 par caractéristique", color='Feature')
+st.plotly_chart(fig)
+
+# Additional Dashboard: Correlation Heatmap
+st.subheader('Carte de Chaleur des Corrélations')
+correlation_matrix = data.corr()
+fig_corr = px.imshow(correlation_matrix, text_auto=True, aspect="auto", color_continuous_scale='Blues', title='Matrice de corrélation des caractéristiques')
+st.plotly_chart(fig_corr)
+
+
+# Prepare data for model
+X = data[['Arabe', 'Math', 'Education islamique', 'Education physique']]
+y = data['Moyenne']
+
+# Split the data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train the model
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# Creating user inputs for prediction
+st.title('Prédiction de la Moyenne')
+arabe = st.number_input('Note en Arabe', min_value=0.0, max_value=20.0, value=10.0)
+math = st.number_input('Note en Mathématiques', min_value=0.0, max_value=20.0, value=10.0)
+islamique = st.number_input('Note en Education Islamique', min_value=0.0, max_value=20.0, value=10.0)
+physique = st.number_input('Note en Education Physique', min_value=0.0, max_value=20.0, value=10.0)
+
+# Predicting the outcome
+if st.button('Prédire la Moyenne'):
+    test_data = pd.DataFrame([[arabe, math, islamique, physique]], columns=['Arabe', 'Math', 'Education islamique', 'Education physique'])
+    prediction = model.predict(test_data)
+    st.subheader('Prévision pour les paramètres entrés')
+    st.write(f"La prévision de la moyenne est : {prediction[0]:.2f}")
